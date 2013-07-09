@@ -4,10 +4,12 @@
 # ==Parameters
 #
 # [sql_connection] Connection url to use to connect to nova sql database.
+# [sql_idle_timeout] Timeout before idle sql connections are reaped.
 # [image_service] Service used to search for and retrieve images. Optional.
 #   Defaults to 'nova.image.local.LocalImageService'
 # [glance_api_servers] List of addresses for api servers. Optional.
 #   Defaults to localhost:9292.
+# [memcached_servers] Use memcached instead of in-process cache. Supply a list of memcached server IP's:Memcached Port. Optional. Defaults to false.
 # [rabbit_host] Location of rabbitmq installation. Optional. Defaults to localhost.
 # [rabbit_port] Port for rabbitmq instance. Optional. Defaults to 5672.
 # [rabbit_hosts] Location of rabbitmq installation. Optional. Defaults to undef.
@@ -33,13 +35,15 @@ class nova(
   # this is how to query all resources from our clutser
   $nova_cluster_id='localcluster',
   $sql_connection = false,
+  $sql_idle_timeout = '3600',
   $rpc_backend = 'nova.openstack.common.rpc.impl_kombu',
   $image_service = 'nova.image.glance.GlanceImageService',
   # these glance params should be optional
   # this should probably just be configured as a glance client
   $glance_api_servers = 'localhost:9292',
+  $memcached_servers = false,
   $rabbit_host = 'localhost',
-  $rabbit_hosts = undef,
+  $rabbit_hosts = false,
   $rabbit_password='guest',
   $rabbit_port='5672',
   $rabbit_userid='guest',
@@ -153,7 +157,8 @@ class nova(
       fail("Invalid db connection ${sql_connection}")
     }
     nova_config {
-      'DEFAULT/sql_connection': value  => $sql_connection, secret => true,
+      'DEFAULT/sql_connection':   value => $sql_connection, secret => true;
+      'DEFAULT/sql_idle_timeout': value => $sql_idle_timeout;
     }
   }
 
@@ -167,6 +172,12 @@ class nova(
 
   nova_config { 'DEFAULT/auth_strategy': value => $auth_strategy }
 
+  if $memcached_servers {
+    nova_config { 'DEFAULT/memcached_servers': value  => join($memcached_servers, ',') }
+  } else {
+    nova_config { 'DEFAULT/memcached_servers': ensure => absent }
+  }
+
   if $rpc_backend == 'nova.openstack.common.rpc.impl_kombu' {
     # I may want to support exporting and collecting these
     nova_config {
@@ -175,18 +186,14 @@ class nova(
       'DEFAULT/rabbit_virtual_host': value => $rabbit_virtual_host;
     }
 
-    if size($rabbit_hosts) > 1 {
-      nova_config { 'DEFAULT/rabbit_ha_queues': value => 'true' }
-    } else {
-      nova_config { 'DEFAULT/rabbit_ha_queues': value => 'false' }
-    }
-
     if $rabbit_hosts {
-      nova_config { 'DEFAULT/rabbit_hosts': value => join($rabbit_hosts, ',') }
-    } elsif $rabbit_host {
-      nova_config { 'DEFAULT/rabbit_host':  value => $rabbit_host }
-      nova_config { 'DEFAULT/rabbit_port':  value => $rabbit_port }
-      nova_config { 'DEFAULT/rabbit_hosts': value => "${rabbit_host}:${rabbit_port}" }
+      nova_config { 'DEFAULT/rabbit_hosts':     value  => join($rabbit_hosts, ',') }
+      nova_config { 'DEFAULT/rabbit_ha_queues': value  => true }
+    } else {
+      nova_config { 'DEFAULT/rabbit_host':      value  => $rabbit_host }
+      nova_config { 'DEFAULT/rabbit_port':      value  => $rabbit_port }
+      nova_config { 'DEFAULT/rabbit_hosts':     value => "${rabbit_host}:${rabbit_port}" }
+      nova_config { 'DEFAULT/rabbit_ha_queues': value => false }
     }
   }
 
