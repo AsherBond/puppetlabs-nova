@@ -6,7 +6,7 @@ $db_password = 'password'
 $rabbit_user     = 'nova'
 $rabbit_password = 'nova'
 $rabbit_vhost    = '/'
-$rabbit_host     = 'rabbitmq'
+$rabbit_hosts    = ['rabbitmq:5672']
 $rabbit_port     = '5672'
 
 $glance_api_servers = 'glance:9292'
@@ -15,21 +15,6 @@ $api_server = 'controller'
 
 resources { 'nova_config':
   purge => true,
-}
-
-# temporarily update this to use the
-# latest tested packages from precise
-# eventually, these packages need to be moved
-# to the openstack module
-stage { 'nova_ppa':
-  before => Stage['main']
-}
-
-class { 'apt':
-  stage => 'nova_ppa',
-}
-class { 'keystone::repo::trunk':
-  stage => 'nova_ppa',
 }
 
 # this is a hack that I have to do b/c openstack nova
@@ -42,10 +27,8 @@ file { '/usr/lib/ruby/1.8/facter/ec2.rb':
 node db {
   class { 'mysql::server':
     config_hash => {
-                     'bind_address' => '0.0.0.0'
-                     #'root_password' => 'foo',
-                     #'etc_root_password' => true
-                   }
+      'bind_address' => '0.0.0.0'
+    }
   }
   class { 'mysql::ruby': }
   class { 'nova::db::mysql':
@@ -60,22 +43,21 @@ node db {
 
 node controller {
   class { 'nova::controller':
-    db_password => $db_password,
-    db_name => $db_name,
-    db_user => $db_username,
-    db_host => $db_host,
+    db_password         => $db_password,
+    db_name             => $db_name,
+    db_user             => $db_username,
+    db_host             => $db_host,
 
-    rabbit_password => $rabbit_password,
-    rabbit_port => $rabbit_port,
-    rabbit_userid => $rabbit_user,
+    rabbit_password     => $rabbit_password,
+    rabbit_userid       => $rabbit_user,
     rabbit_virtual_host => $rabbit_vhost,
-    rabbit_host => $rabbit_host,
+    rabbit_hosts        => $rabbit_hosts,
 
-    image_service => 'nova.image.glance.GlanceImageService',
+    image_service       => 'nova.image.glance.GlanceImageService',
 
-    glance_api_servers => $glance_api_servers,
+    glance_api_servers  => $glance_api_servers,
 
-    libvirt_type => 'qemu',
+    libvirt_type        => 'qemu',
   }
 }
 
@@ -92,13 +74,12 @@ node compute {
     flat_network_bridge_ip      => '11.0.0.1',
     flat_network_bridge_netmask => '255.255.255.0',
   }
-  class { "nova":
+  class { 'nova':
     verbose             => $verbose,
     sql_connection      => "mysql://${db_username}:${db_password}@${db_host}/${db_name}",
     image_service       => 'nova.image.glance.GlanceImageService',
     glance_api_servers  => $glance_api_servers,
-    rabbit_host         => $rabbit_host,
-    rabbit_port         => $rabbit_port,
+    rabbit_hosts        => $rabbit_hosts,
     rabbit_userid       => $rabbit_user,
     rabbit_password     => $rabbit_password,
     rabbit_virtual_host => $rabbit_virtual_host,
@@ -114,11 +95,6 @@ node glance {
 }
 
 node rabbitmq {
-  if($::operatingsystem == 'Ubuntu') {
-    class { 'rabbitmq::repo::apt':
-      stage => 'nova_ppa',
-    }
-  }
   class { 'nova::rabbitmq':
     userid       => $rabbit_user,
     password     => $rabbit_password,
@@ -149,7 +125,7 @@ node puppetmaster {
     version                 => installed,
     puppet_master_package   => 'puppet',
     package_provider        => 'gem',
-    autosign                => 'true',
+    autosign                => true,
     certname                => $clientcert,
   }
 }
@@ -174,21 +150,20 @@ node all {
   class { 'keystone::roles::admin': }
 
   class { 'nova::all':
-    db_password => 'password',
-    db_name => 'nova',
-    db_user => 'nova',
-    db_host => 'localhost',
+    db_password         => 'password',
+    db_name             => 'nova',
+    db_user             => 'nova',
+    db_host             => 'localhost',
 
-    rabbit_password => 'rabbitpassword',
-    rabbit_port => '5672',
-    rabbit_userid => 'rabbit_user',
+    rabbit_password     => 'rabbitpassword',
+    rabbit_userid       => 'rabbit_user',
     rabbit_virtual_host => '/',
-    rabbit_host => 'localhost',
+    rabbit_hosts        => ['localhost:5672'],
 
-    image_service => 'nova.image.glance.GlanceImageService',
-    glance_api_servers => $glance_api_servers,
+    image_service       => 'nova.image.glance.GlanceImageService',
+    glance_api_servers  => $glance_api_servers,
 
-    libvirt_type => 'qemu',
+    libvirt_type        => 'qemu',
   }
 }
 

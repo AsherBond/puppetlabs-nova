@@ -12,18 +12,18 @@
 #   the fixed and floating ranges provided.
 #
 class nova::network(
-  $private_interface,
-  $fixed_range,
-  $public_interface = undef,
-  $num_networks     = 1,
-  $network_size     = 255,
-  $floating_range   = false,
-  $enabled          = false,
-  $network_manager  = 'nova.network.manager.FlatDHCPManager',
-  $config_overrides = {},
-  $create_networks  = true,
-  $ensure_package   = 'present',
-  $install_service  = true
+  $private_interface = undef,
+  $fixed_range       = '10.0.0.0/8',
+  $public_interface  = undef,
+  $num_networks      = 1,
+  $network_size      = 255,
+  $floating_range    = false,
+  $enabled           = false,
+  $network_manager   = 'nova.network.manager.FlatDHCPManager',
+  $config_overrides  = {},
+  $create_networks   = true,
+  $ensure_package    = 'present',
+  $install_service   = true
 ) {
 
   include nova::params
@@ -40,7 +40,7 @@ class nova::network(
   }
 
   if $floating_range {
-    nova_config { 'floating_range':   value => $floating_range }
+    nova_config { 'DEFAULT/floating_range':   value => $floating_range }
   }
 
   if has_key($config_overrides, 'vlan_start') {
@@ -68,7 +68,7 @@ class nova::network(
     }
     if $floating_range {
       nova::manage::floating { 'nova-vm-floating':
-        network       => $floating_range,
+        network => $floating_range,
       }
     }
   }
@@ -102,16 +102,6 @@ class nova::network(
       $resource_parameters = merge($config_overrides, $parameters)
       $vlan_resource = { 'nova::network::vlan' => $resource_parameters }
       create_resources('class', $vlan_resource)
-    }
-    # I don't think this is applicable to Folsom...
-    # If it is, the details will need changed. -jt
-    'nova.network.quantum.manager.QuantumManager': {
-      $parameters = { fixed_range      => $fixed_range,
-                      public_interface => $public_interface,
-                    }
-      $resource_parameters = merge($config_overrides, $parameters)
-      $quantum_resource = { 'nova::network::quantum' => $resource_parameters }
-      create_resources('class', $quantum_resource)
     }
     default: {
       fail("Unsupported network manager: ${nova::network_manager} The supported network managers are nova.network.manager.FlatManager, nova.network.FlatDHCPManager and nova.network.manager.VlanManager")

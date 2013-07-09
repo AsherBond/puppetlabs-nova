@@ -13,23 +13,6 @@ resources { 'nova_config':
   purge => true,
 }
 
-if $::osfamily == 'Debian' {
-  # temporarily update this to use the
-  # latest tested packages from precise
-  # eventually, these packages need to be moved
-  # to the openstack module
-  stage { 'nova_ppa':
-    before => Stage['main']
-  }
-
-  class { 'apt':
-    stage => 'nova_ppa',
-  }
-  class { 'keystone::repo::trunk':
-    stage => 'nova_ppa',
-  }
-}
-
 Exec {
   logoutput => true,
 }
@@ -61,8 +44,8 @@ node /controller/ {
   $nova_db = "mysql://nova:${nova_db_password}@${controller_host}/nova"
 
   # export all of the things that will be needed by the clients
-  @@nova_config { 'rabbit_host': value => $controller_host }
-  Nova_config <| title == 'rabbit_host' |>
+  @@nova_config { 'rabbit_hosts': value => $controller_host }
+  Nova_config <| title == 'rabbit_hosts' |>
   @@nova_config { 'sql_connection': value => $nova_db }
   Nova_config <| title == 'sql_connection' |>
   @@nova_config { 'glance_api_servers': value => $glance_api_servers }
@@ -163,7 +146,7 @@ node /controller/ {
   class { 'nova':
     sql_connection     => false,
     # this is false b/c we are exporting
-    rabbit_host        => false,
+    rabbit_hosts       => false,
     rabbit_userid      => $rabbit_user,
     rabbit_password    => $rabbit_password,
     image_service      => 'nova.image.glance.GlanceImageService',
@@ -184,20 +167,20 @@ node /controller/ {
     enabled => true,
   }
 
-  nova::manage::network { "nova-vm-net":
+  nova::manage::network { 'nova-vm-net':
     network       => '11.0.0.0/24',
     available_ips => 128,
   }
 
-  nova::manage::floating { "nova-vm-floating":
-    network       => '10.128.0.0/24',
+  nova::manage::floating { 'nova-vm-floating':
+    network => '10.128.0.0/24',
   }
 
   class { 'nova::objectstore':
     enabled => true
   }
 
-  class { 'nova::volume': 
+  class { 'nova::volume':
     enabled => true,
   }
 
@@ -235,7 +218,7 @@ node /compute/ {
   class { 'nova':
     # set sql and rabbit to false so that the resources will be collected
     sql_connection     => false,
-    rabbit_host        => false,
+    rabbit_hosts       => false,
     image_service      => 'nova.image.glance.GlanceImageService',
     glance_api_servers => false,
     rabbit_userid      => $rabbit_user,
