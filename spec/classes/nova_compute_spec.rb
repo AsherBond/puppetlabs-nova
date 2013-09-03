@@ -10,7 +10,8 @@ describe 'nova::compute' do
 
     let :params do
       {
-        :vncproxy_host => '127.0.0.1'
+        :vncproxy_host   => '127.0.0.1',
+        :neutron_enabled => true
       }
     end
 
@@ -36,12 +37,15 @@ describe 'nova::compute' do
         'ensure' => 'present',
         'notify' => 'Service[nova-compute]'
       ) }
-      it { should contain_package('bridge-utils').with(
+      it { should_not contain_package('bridge-utils').with(
         :ensure => 'present',
         :before => 'Nova::Generic_service[compute]'
       ) }
+      it { should contain_package('pm-utils').with(
+        :ensure => 'present'
+      ) }
 
-      describe 'with enabled as true' do
+      describe 'with vnc_enabled set to true' do
         let :params do
           {
             :enabled       => true,
