@@ -108,7 +108,12 @@
 #   Defaults to 60
 #
 # [*logdir*]
+#   (optional) Deprecated. Use log_dir instead.
+#   Defaults to false
+#
+# [*log_dir*]
 #   (optional) Directory where logs should be stored.
+#   If set to boolean false, it will not log to any directory.
 #   Defaults to '/var/log/nova'
 #
 # [*state_path*]
@@ -145,50 +150,50 @@
 #   Defaults to 'LOG_USER'
 #
 class nova(
-  $ensure_package = 'present',
-  # note: sql_* deprecated for database_*
-  $sql_connection = false,
-  $sql_idle_timeout = false,
-  $database_connection = false,
-  $database_idle_timeout = 3600,
-  $rpc_backend = 'nova.openstack.common.rpc.impl_kombu',
-  $image_service = 'nova.image.glance.GlanceImageService',
+  $ensure_package           = 'present',
+  $database_connection      = false,
+  $database_idle_timeout    = 3600,
+  $rpc_backend              = 'nova.openstack.common.rpc.impl_kombu',
+  $image_service            = 'nova.image.glance.GlanceImageService',
   # these glance params should be optional
   # this should probably just be configured as a glance client
-  $glance_api_servers = 'localhost:9292',
-  $memcached_servers = false,
-  $rabbit_host = 'localhost',
-  $rabbit_hosts = false,
-  $rabbit_password='guest',
-  $rabbit_port='5672',
-  $rabbit_userid='guest',
-  $rabbit_virtual_host='/',
-  $qpid_hostname = 'localhost',
-  $qpid_port = '5672',
-  $qpid_username = 'guest',
-  $qpid_password = 'guest',
-  $qpid_sasl_mechanisms = false,
-  $qpid_heartbeat = 60,
-  $qpid_protocol = 'tcp',
-  $qpid_tcp_nodelay = true,
-  $auth_strategy = 'keystone',
-  $service_down_time = 60,
-  $logdir = '/var/log/nova',
-  $state_path = '/var/lib/nova',
-  $lock_path = $::nova::params::lock_path,
-  $verbose = false,
-  $debug = false,
-  $periodic_interval = '60',
-  $report_interval = '10',
-  $rootwrap_config = '/etc/nova/rootwrap.conf',
+  $glance_api_servers       = 'localhost:9292',
+  $memcached_servers        = false,
+  $rabbit_host              = 'localhost',
+  $rabbit_hosts             = false,
+  $rabbit_password          = 'guest',
+  $rabbit_port              = '5672',
+  $rabbit_userid            = 'guest',
+  $rabbit_virtual_host      = '/',
+  $qpid_hostname            = 'localhost',
+  $qpid_port                = '5672',
+  $qpid_username            = 'guest',
+  $qpid_password            = 'guest',
+  $qpid_sasl_mechanisms     = false,
+  $qpid_heartbeat           = 60,
+  $qpid_protocol            = 'tcp',
+  $qpid_tcp_nodelay         = true,
+  $auth_strategy            = 'keystone',
+  $service_down_time        = 60,
+  $log_dir                  = '/var/log/nova',
+  $state_path               = '/var/lib/nova',
+  $lock_path                = $::nova::params::lock_path,
+  $verbose                  = false,
+  $debug                    = false,
+  $periodic_interval        = '60',
+  $report_interval          = '10',
+  $rootwrap_config          = '/etc/nova/rootwrap.conf',
   # deprecated in folsom
   #$root_helper = $::nova::params::root_helper,
   $monitoring_notifications = false,
-  $use_syslog = false,
-  $log_facility = 'LOG_USER',
+  $use_syslog               = false,
+  $log_facility             = 'LOG_USER',
   # DEPRECATED PARAMETERS
   # this is how to query all resources from our clutser
-  $nova_cluster_id = undef,
+  $nova_cluster_id          = undef,
+  $sql_connection           = false,
+  $sql_idle_timeout         = false,
+  $logdir                   = false,
 ) inherits nova::params {
 
   if $nova_cluster_id {
@@ -247,10 +252,6 @@ class nova(
     require => Package['nova-common'],
   }
 
-  file { $logdir:
-    ensure  => directory,
-    mode    => '0750',
-  }
   file { '/etc/nova/nova.conf':
     mode  => '0640',
   }
@@ -263,14 +264,14 @@ class nova(
   }
 
   if $sql_connection {
-    warning('sql_connection deprecated for database_connection')
+    warning('The sql_connection parameter is deprecated, use database_connection instead.')
     $database_connection_real = $sql_connection
   } else {
     $database_connection_real = $database_connection
   }
 
   if $sql_idle_timeout {
-    warning('sql_idle_timeout deprecated for database_idle_timeout')
+    warning('The sql_idle_timeout parameter is deprecated, use database_idle_timeout instead.')
     $database_idle_timeout_real = $sql_idle_timeout
   } else {
     $database_idle_timeout_real = $database_idle_timeout
@@ -356,10 +357,26 @@ class nova(
     }
   }
 
+  if $logdir {
+    warning('The logdir parameter is deprecated, use log_dir instead.')
+    $log_dir_real = $logdir
+  } else {
+    $log_dir_real = $log_dir
+  }
+
+  if $log_dir_real {
+    file { $log_dir_real:
+      ensure  => directory,
+      mode    => '0750',
+    }
+    nova_config { 'DEFAULT/log_dir': value => $log_dir_real;}
+  } else {
+    nova_config { 'DEFAULT/log_dir': ensure => absent;}
+  }
+
   nova_config {
     'DEFAULT/verbose':           value => $verbose;
     'DEFAULT/debug':             value => $debug;
-    'DEFAULT/logdir':            value => $logdir;
     'DEFAULT/rpc_backend':       value => $rpc_backend;
     # Following may need to be broken out to different nova services
     'DEFAULT/state_path':        value => $state_path;
